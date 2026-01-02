@@ -2,6 +2,7 @@
 
 PlayerCharacter* player;
 TESGlobal* countGlobal;
+BGSListForm* diseasesList;
 BGSKeyword* fortifyHealth;
 bool bTaskQueued = false;
 
@@ -50,13 +51,30 @@ bool IsHealthModifierEffect(EffectSetting* a_effect) {
     return false;
 }
 
+void Setup() {
+    auto& all = TESDataHandler::GetSingleton()->GetFormArray<SpellItem>();
+    for (auto* spell : all) {
+        if (spell && spell->GetSpellType() == MagicSystem::SpellType::kDisease) {
+            diseasesList->AddForm(spell);
+        }
+    }
+}
+
+bool espLoaded = false;
+
 SKSEPluginLoad(const SKSE::LoadInterface* skse) {
     SKSE::Init(skse);
 
     SKSE::GetMessagingInterface()->RegisterListener([](SKSE::MessagingInterface::Message* message) {
         if (message->type == SKSE::MessagingInterface::kDataLoaded) {
+            diseasesList = TESForm::LookupByEditorID<BGSListForm>("LoreTraits_DiseaseSpellsList");
+            if (diseasesList) {
+                espLoaded = true;
+            }
         } else if (message->type == SKSE::MessagingInterface::kPostLoadGame ||
                    message->type == SKSE::MessagingInterface::kNewGame) {
+            if (!espLoaded) return;
+            Setup();
             static bool init = false;
             if (init) return;
             countGlobal = TESForm::LookupByEditorID<TESGlobal>("LoreTraits_PlayerDiseaseCount");
