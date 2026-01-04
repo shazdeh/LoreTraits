@@ -1,8 +1,10 @@
 ﻿#include <unordered_set>
 
 PlayerCharacter* player;
-TESGlobal* countGlobal;
+TESGlobal* diseaseCountGlobal;
+TESGlobal* doneQuestsCountGlobal;
 BGSListForm* diseasesList;
+BGSListForm* doneQuests;
 BGSKeyword* fortifyHealth;
 bool bTaskQueued = false;
 
@@ -19,7 +21,7 @@ void UpdateDiseaseCount() {
         }
     }
 
-    countGlobal->value = count;
+    diseaseCountGlobal->value = count;
     bTaskQueued = false;
 }
 
@@ -29,11 +31,22 @@ void MaybeUpdateDiseaseCount() {
     SKSE::GetTaskInterface()->AddTask(UpdateDiseaseCount);
 }
 
-class theSink : public BSTEventSink<TESMagicEffectApplyEvent> {
+class theSink : public BSTEventSink<TESMagicEffectApplyEvent>, public BSTEventSink<TESQuestStageEvent> {
     BSEventNotifyControl ProcessEvent(const TESMagicEffectApplyEvent* event,
                                       BSTEventSource<TESMagicEffectApplyEvent>*) {
         if (event->target && event->target->IsPlayerRef()) {
             MaybeUpdateDiseaseCount();
+        }
+        return BSEventNotifyControl::kContinue;
+    }
+
+    BSEventNotifyControl ProcessEvent(const TESQuestStageEvent* event, BSTEventSource<TESQuestStageEvent>*) {
+        if (TESQuest* quest = TESForm::LookupByID<TESQuest>(event->formID)) {
+            if (quest->IsCompleted() && quest->data.questType != QUEST_DATA::Type::kNone &&
+                !quest->objectives.empty() && !doneQuests->HasForm(quest)) {
+                doneQuestsCountGlobal->value += 1;
+                doneQuests->AddForm(quest);
+            }
         }
         return BSEventNotifyControl::kContinue;
     }
@@ -52,8 +65,8 @@ bool IsHealthModifierEffect(EffectSetting* a_effect) {
 }
 
 void Setup() {
-    auto& all = TESDataHandler::GetSingleton()->GetFormArray<SpellItem>();
-    for (auto* spell : all) {
+    auto& allSpells = TESDataHandler::GetSingleton()->GetFormArray<SpellItem>();
+    for (auto* spell : allSpells) {
         if (spell && spell->GetSpellType() == MagicSystem::SpellType::kDisease) {
             diseasesList->AddForm(spell);
         }
@@ -77,12 +90,15 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
             Setup();
             static bool init = false;
             if (init) return;
-            countGlobal = TESForm::LookupByEditorID<TESGlobal>("LoreTraits_PlayerDiseaseCount");
-            if (!countGlobal) return;
+            diseaseCountGlobal = TESForm::LookupByEditorID<TESGlobal>("LoreTraits_PlayerDiseaseCount");
+            if (!diseaseCountGlobal) return;
+            doneQuestsCountGlobal = TESForm::LookupByEditorID<TESGlobal>("LoreTraits_DoneQuestsCount");
+            doneQuests = TESForm::LookupByEditorID<BGSListForm>("LoreTraits_DoneQuestsList");
             // fortifyHealth = TESForm::LookupByEditorID<BGSKeyword>("LoreTraits_FortifyHealthEffect");
             player = RE::PlayerCharacter::GetSingleton();
             static theSink g_sink;
-            ScriptEventSourceHolder::GetSingleton()->AddEventSink(&g_sink);
+            ScriptEventSourceHolder::GetSingleton()->AddEventSink<TESMagicEffectApplyEvent>(&g_sink);
+            ScriptEventSourceHolder::GetSingleton()->AddEventSink<TESQuestStageEvent>(&g_sink);
             init = true;
         }
     });
