@@ -43,7 +43,8 @@ class theSink : public BSTEventSink<TESMagicEffectApplyEvent>, public BSTEventSi
     BSEventNotifyControl ProcessEvent(const TESQuestStageEvent* event, BSTEventSource<TESQuestStageEvent>*) {
         if (TESQuest* quest = TESForm::LookupByID<TESQuest>(event->formID); quest) {
             if (quest->IsCompleted() && quest->data.questType != QUEST_DATA::Type::kNone &&
-                !quest->objectives.empty() && !doneQuests->HasForm(quest)) {
+                !quest->objectives.empty() && !doneQuests->HasForm(quest) &&
+                !quest->data.flags.any(QuestFlag::kFailed)) {
                 doneQuestsCountGlobal->value += 1;
                 doneQuests->AddForm(quest);
             }

@@ -2,6 +2,7 @@
 
 SKSE plugin for LoreRim Traits mod.
 1. Adds a GlobalVariable to track how many diseases is caught by the player.
+2. Adds a GlobalVariable to track completed quests.
 
 Based on CommonLibSSE NG:
 
